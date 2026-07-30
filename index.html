@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fourier Series Calculator</title>
+
+<!-- Chart.js (verified-valid cdnjs build) + zoom/pan plugin and its Hammer.js touch-gesture dependency -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body data-theme="dark">
+
+  <!-- ============ HEADER ============ -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">&#8721;</span>
+      <div class="brand-text">
+        <h1>Fourier Series Calculator</h1>
+        <p class="brand-sub">Decompose a periodic function into sines and cosines</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="printBtn" class="icon-btn" title="Print results">&#128438;<span class="icon-btn-label">Print</span></button>
+      <button id="themeToggle" class="theme-toggle" aria-label="Toggle light and dark theme" title="Toggle theme (Alt+T)">
+        <span class="theme-icon" id="themeIcon">&#9789;</span>
+        <span class="theme-label" id="themeLabel">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ============ CONTROLS COLUMN ============ -->
+    <section class="controls-column">
+
+      <details class="card" open>
+        <summary>Function Input <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+          <div class="field">
+            <label for="funcInput">Function f(x)</label>
+            <input type="text" id="funcInput" value="x" spellcheck="false" autocomplete="off"
+                   placeholder="e.g. x^2, sin(x), sqrt(x^2+1), |x|" />
+            <p class="hint">
+              Natural notation supported: <code>x^2</code>, <code>sin</code>, <code>cos</code>, <code>tan</code>,
+              <code>asin</code>, <code>acos</code>, <code>atan</code>, <code>sqrt</code>, <code>abs</code>,
+              <code>ln</code> (natural log), <code>log</code> (base 10), <code>exp</code>, <code>pi</code>, <code>e</code>,
+              <code>|x|</code>. Raw JavaScript (<code>Math.sin(x)</code>) also still works.
+            </p>
+          </div>
+          <div class="field">
+            <label for="sampleSelect">Sample functions</label>
+            <select id="sampleSelect">
+              <option value="">&mdash; choose a preset &mdash;</option>
+              <option value="linear">f(x) = x</option>
+              <option value="quadratic">f(x) = x&sup2;</option>
+              <option value="cubic">f(x) = x&sup3;</option>
+              <option value="sinFn">f(x) = sin(x)</option>
+              <option value="cosFn">f(x) = cos(x)</option>
+              <option value="square">Square Wave</option>
+              <option value="sawtooth">Sawtooth Wave</option>
+              <option value="triangle">Triangle Wave</option>
+              <option value="rectifiedSine">Rectified Sine</option>
+              <option value="absValue">Absolute Value</option>
+              <option value="exponential">Exponential (e&#x2093;)</option>
+              <option value="piecewise">Piecewise (0 / x)</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Calculation Settings <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field">
+              <label for="periodInput">Period T</label>
+              <input type="number" id="periodInput" value="6.283185307" step="any" />
+            </div>
+            <div class="field">
+              <label for="termsInput">Max terms N</label>
+              <input type="number" id="termsInput" value="10" min="1" max="100" step="1" />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="lowerLimit">Lower limit (a)</label>
+              <input type="number" id="lowerLimit" value="-3.141592653" step="any" disabled />
+            </div>
+            <div class="field">
+              <label for="upperLimit">Upper limit (b)</label>
+              <input type="number" id="upperLimit" value="3.141592653" step="any" disabled />
+            </div>
+          </div>
+          <div class="field checkbox-field">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoLimits" checked />
+              Auto-set limits to [&minus;T/2, T/2]
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>Advanced Settings <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+          <div class="field">
+            <label for="methodSelect">Integration method</label>
+            <select id="methodSelect">
+              <option value="simpson" selected>Simpson's Rule</option>
+              <option value="trapezoidal">Trapezoidal Rule</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="samplesInput">Integration steps (even number)</label>
+            <input type="number" id="samplesInput" value="1000" min="10" step="2" />
+            <p class="hint">Higher step counts improve accuracy but take marginally longer to compute.</p>
+          </div>
+        </div>
+      </details>
+
+      <div class="panel action-panel">
+        <div class="button-row">
+          <button id="calculateBtn" class="btn btn-primary">
+            <span class="btn-spinner" id="btnSpinner" hidden></span>
+            <span id="calculateLabel">Calculate</span>
+          </button>
+          <button id="resetBtn" class="btn btn-secondary" title="Reset all fields and clear saved session">Reset</button>
+        </div>
+        <div class="button-row">
+          <button id="exportReportBtn" class="btn btn-ghost">Export Report</button>
+          <button id="copyResultsBtn" class="btn btn-ghost">Copy Results</button>
+        </div>
+        <div id="errorBox" class="error-box" role="alert" hidden></div>
+      </div>
+
+    </section>
+
+    <!-- ============ RESULTS COLUMN ============ -->
+    <section class="results-column">
+
+      <details class="card" open>
+        <summary>Visualization <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+
+          <div class="slider-row">
+            <label for="termSlider">Terms shown: <span id="termSliderValue">10</span></label>
+            <input type="range" id="termSlider" min="0" max="10" value="10" step="1" disabled />
+          </div>
+
+          <div class="chart-toolbar">
+            <span class="chart-hint">Scroll or pinch to zoom &middot; drag to pan</span>
+            <button id="resetZoomBtn" class="btn-small">Reset View</button>
+          </div>
+
+          <div class="chart-wrapper">
+            <canvas id="fourierChart"></canvas>
+          </div>
+
+          <div class="status-line" id="integrationStatus">&nbsp;</div>
+          <div class="status-line" id="convergenceStatus">&nbsp;</div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Fourier Equation <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+          <div id="equationDisplay" class="equation-display">
+            Enter a function and press <strong>Calculate</strong> to see its Fourier expansion.
+          </div>
+          <button id="copyLatexBtn" class="btn-small">Copy as LaTeX</button>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Fourier Coefficients <span class="chevron">&#9662;</span></summary>
+        <div class="card-body">
+          <div class="table-toolbar">
+            <input type="text" id="tableSearch" placeholder="Search by n or value&hellip;" aria-label="Search coefficients" />
+            <button id="copyTableBtn" class="btn-small">Copy</button>
+            <button id="exportCsvBtn" class="btn-small">Export CSV</button>
+          </div>
+          <div class="table-scroll">
+            <table id="coeffTable">
+              <thead>
+                <tr>
+                  <th data-col="n" class="sortable">n <span class="sort-arrow"></span></th>
+                  <th data-col="an" class="sortable">a<sub>n</sub> <span class="sort-arrow"></span></th>
+                  <th data-col="bn" class="sortable">b<sub>n</sub> <span class="sort-arrow"></span></th>
+                </tr>
+              </thead>
+              <tbody id="coeffTableBody">
+                <tr><td colspan="3" class="empty-row">No data yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Built with vanilla HTML, CSS &amp; JavaScript &middot; Numerical integration via Simpson's / Trapezoidal rule</p>
+    <p class="shortcuts-line">
+      Shortcuts: <kbd>Ctrl</kbd>+<kbd>Enter</kbd> Calculate &middot; <kbd>Alt</kbd>+<kbd>R</kbd> Reset &middot; <kbd>Alt</kbd>+<kbd>T</kbd> Theme
+    </p>
+  </footer>
+
+<script src="script.js"></script>
+</body>
+</html>
